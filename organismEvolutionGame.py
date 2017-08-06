@@ -1,8 +1,8 @@
 import random
-import numpy as np
+import math
 
 class population(object):
-    def __init__(self, organisms_nr = 2, anchors_nr_limit = 2, muscles_nr_limit = 1):
+    def __init__(self, organisms_nr = 2, anchors_nr_limit = 2, muscles_nr_limit = 1, size_limit = 100):
         '''
         Initialize an population instance with a specific number of organisms.
         '''
@@ -14,14 +14,14 @@ class population(object):
         for organism_nr in range(1, self.organisms_nr):
             anchors_nr = random.randint(2, self.anchors_nr_limit)
             muscles_nr = random.randint(1, self.muscles_nr_limit)
-            size = random.random()*20
+            size = random.random()*size_limit
             self.population.append(organism(anchors_nr, muscles_nr, size))
 
     def describePopulation(self):
-        print("Population composed of %(organisms_nr)s organisms, with a limit on anchors number equal %(anchors_nr_limit)s and on muscles number %(muscles_nr_limit)s." % vars(self))
+        print("Population composed of %(organisms_nr)s organisms, with a limit on anchors number equal %(anchors_nr_limit)s and on muscles %(muscles_nr_limit)s." % vars(self))
         for organism in self.population:
             organism.describe()
-            organism.drawOrganism()
+            #organism.drawOrganism()
 
 
 class organism(object):
@@ -67,6 +67,26 @@ class organism(object):
             connection, contraction_time, contraction_speed, relaxation_time = muscle.describe()
         return self.muscles
 
+    def initialDisplay(self, x0, y0):
+        noStroke()
+        x_correction = x0 - self.size/2
+        y_correction = y0 - self.size
+        for anchor in self.anchors:
+            (position, friction, weight, size) = anchor.describe(silent = True)
+            radius = math.sqrt(size/math.pi)
+            fill(255, 255, 255, 200)
+            ellipse(int(position[0] + x_correction), int(position[1] + y_correction), size/4, size/4)
+        for muscle in self.muscles:
+            connection, contraction_time, contraction_speed, relaxation_time = muscle.describe(silent = True)
+            anchor_A = self.anchors[connection[0] - 1].position
+            anchor_B = self.anchors[connection[1] - 1].position
+            stroke(255)
+            x1 = int(anchor_A[0] + x_correction)
+            y1 = int(anchor_A[1] + y_correction)
+            x2 = int(anchor_B[0] + x_correction)
+            y2 = int(anchor_B[1] + y_correction)
+            line(x1, y1, x2, y2) 
+
     def drawOrganism(self):
         import matplotlib.pyplot as plt
         plt.figure(figsize=(5, 5))
@@ -74,7 +94,7 @@ class organism(object):
         
         for anchor in self.anchors:
             (position, friction, weight, size) = anchor.describe(silent = True)
-            circle = plt.Circle((position[0],position[1]), radius = (size/np.pi)**(1/2), alpha = .5)
+            circle = plt.Circle((position[0],position[1]), radius = (size/math.pi(3.14))**(1/2), alpha = .5)
             ax.add_patch(circle)
 
         from matplotlib.path import Path
@@ -84,7 +104,6 @@ class organism(object):
             anchor_A = self.anchors[connection[0] - 1].position
             anchor_B = self.anchors[connection[1] - 1].position
             path = Path([anchor_A, anchor_B])
-            #circle = plt.Circle((position[0],position[1]), radius = (size/np.pi)**(1/2), alpha = .5)
             ax.add_patch(patches.PathPatch(path, color = 'red', lw = 0.5))
 
         plt.xlim(0, self.size)
@@ -146,5 +165,3 @@ class muscle(object):
 #anchors = organism.describeAnchors()
 #muscles = organism.describeMuscles()
 #organism.drawOrganism()
-
-
