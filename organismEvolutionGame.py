@@ -1,8 +1,8 @@
 import random
 import math
 
-class population(object):
-    def __init__(self, organisms_nr = 2, anchors_nr_limit = 2, muscles_nr_limit = 1, size_limit = 100):
+class Population(object):
+    def __init__(self, organisms_nr = 2, anchors_nr_limit = 2, muscles_nr_limit = 1, size_limit = 100, active_window=(0, 0)):
         '''
         Initialize an population instance with a specific number of organisms.
 
@@ -20,24 +20,26 @@ class population(object):
         self.organisms_nr = organisms_nr
         self.anchors_nr_limit = anchors_nr_limit
         self.muscles_nr_limit = muscles_nr_limit
-        self.population = []
+        self.organisms = []
+        self.active_window = active_window
 
         for organism_nr in range(1, self.organisms_nr):
             anchors_nr = random.randint(2, self.anchors_nr_limit)
             muscles_nr = random.randint(1, self.muscles_nr_limit)
             size = random.random()*size_limit
-            self.population.append(organism(anchors_nr, muscles_nr, size))
+            self.organisms.append(Organism(
+                anchors_nr, muscles_nr, size, active_window))
 
     def describePopulation(self):
         '''
         Prints a short description of the population.
         '''
         print("Population composed of %(organisms_nr)s organisms, with a limit on anchors number equal %(anchors_nr_limit)s and on muscles %(muscles_nr_limit)s." % vars(self))
-        for organism in self.population:
+        for organism in self.organisms:
             organism.describe()
 
-class organism(object):
-    def __init__(self, anchors_nr, muscles_nr, size):
+class Organism(object):
+    def __init__(self, anchors_nr, muscles_nr, size, active_window):
         '''
         Initialize an organism instance of specific size with a number of anchors and muscles connecting them.
 
@@ -54,7 +56,13 @@ class organism(object):
             size - int, the size of the organism.
 
         '''
+
         self.size = size
+        self.active_window = active_window
+
+        x_correction = active_window[0] - self.size/2
+        y_correction = active_window[1] - self.size
+        self.center_correction = (y_correction, x_correction)
 
         self.anchors_nr = anchors_nr
         self.anchors = self.initializeAnchors()
@@ -79,10 +87,11 @@ class organism(object):
 
         Returns:
             anchors - list, objects class anchor.
-        '''
+        '''        
         anchors = []
         for anchor_nr in range(1, self.anchors_nr + 1):
-            anchors.append(anchor(anchor_nr, self.size))
+            anchors.append(Anchor(
+                anchor_nr, self.size, self.active_window, self.center_correction))
         return anchors
 
     def describeAnchors(self):
@@ -106,9 +115,9 @@ class organism(object):
         '''
         muscles = []
         for muscle_nr in range(1, self.anchors_nr):
-            muscles.append(muscle(nr = muscle_nr, anchor_A = muscle_nr, anchor_B = muscle_nr + 1))
+            muscles.append(Muscle(nr = muscle_nr, anchor_A = muscle_nr, anchor_B = muscle_nr + 1))
         for muscle_nr in range(self.anchors_nr, self.muscles_nr + 1):
-            muscles.append(muscle(nr = muscle_nr, anchors_nr = self.anchors_nr))
+            muscles.append(Muscle(nr = muscle_nr, anchors_nr = self.anchors_nr))
         self.muscles_nr = len(muscles)
         return muscles
 
@@ -122,33 +131,63 @@ class organism(object):
         for muscle in self.muscles:
             connection, contraction_time, contraction_speed, relaxation_time = muscle.describe()
         return self.muscles
-    #--------------------------
-    #Draw in Processing
+
     def initialDisplay(self, x0, y0):
         '''
         Displays in processing an organism build of anchors and muscles.
         '''
         noStroke()
-        x_correction = x0 - self.size/2
-        y_correction = y0 - self.size
-        for anchor in self.anchors:
-            (position, friction, weight, size) = anchor.describe(silent = True)
-            radius = math.sqrt(size/math.pi)
-            fill(255, 255, 255, 200)
-            ellipse(int(position[0] + x_correction), int(position[1] + y_correction), size/4, size/4)
-        for muscle in self.muscles:
-            connection, contraction_time, contraction_speed, relaxation_time = muscle.describe(silent = True)
-            anchor_A = self.anchors[connection[0] - 1].position
-            anchor_B = self.anchors[connection[1] - 1].position
-            stroke(255)
-            x1 = int(anchor_A[0] + x_correction)
-            y1 = int(anchor_A[1] + y_correction)
-            x2 = int(anchor_B[0] + x_correction)
-            y2 = int(anchor_B[1] + y_correction)
-            line(x1, y1, x2, y2) 
 
-class anchor(object):
-    def __init__(self, nr, size_organism):
+        for anchor_nr, anchor in enumerate(self.anchors):
+            anchor.display()
+
+        for muscle in self.muscles:
+            muscle.display(self.anchors)
+
+    def update(self):
+        for anchor_nr, anchor in enumerate(self.anchors):
+            anchor.update()
+
+        # for muscle in self.muscles:
+        #     muscle.update(self.anchors)
+
+    def display(self):
+        for anchor_nr, anchor in enumerate(self.anchors):
+            anchor.display()
+
+        for muscle in self.muscles:
+            muscle.display(self.anchors)
+
+    def animateOrganism(self):
+        '''
+        Simulate movement of an organism.
+        '''
+
+        pass
+
+class Mover(object):
+
+    def __init__(self, x, y):
+        self.acceleration = None
+        self.weight = None
+        self.size = None
+
+        self.location = PVector(x, y)
+        self.velocity = PVector(0., 0.)
+        self.gravity = PVector(0, 0.2)
+ 
+    def update(self):
+        self.location.add(self.velocity)
+        self.velocity.add(self.weight*self.gravity)
+        if self.location.x < 0 or self.location.x > self.active_window[0]:
+            self.velocity.x = self.velocity.x * -1
+        # Bounce from the ground and reduce velocity slightly when it hits it
+        if self.location.y > self.active_window[1] - self.size/2:
+            self.velocity.y = self.velocity.y * -0.50
+            self.location.y = self.active_window[1] - self.size/2
+
+class Anchor(Mover):
+    def __init__(self, nr, size_organism, active_window, center_correction):
         '''
         Initialize an anchor instance with random friction, weight and size positioned in an organism of predifined size.
 
@@ -164,12 +203,18 @@ class anchor(object):
             size - float, a value scaled 0-size_organism for the size of the anchor.
         '''
         self.nr = nr
-        x = random.random()*size_organism
-        y = random.random()*size_organism
-        self.position = (x, y)
+
+        self.active_window = active_window
+
+        self.center_correction = center_correction
+        x = random.random()*size_organism + center_correction[0]/2
+        y = random.random()*size_organism + center_correction[1]
+        self.initial_position = (x, y)
+        super(Anchor, self).__init__(x, y)
+
         self.friction = random.random()
         self.weight = random.random()
-        self.size = random.random()*size_organism
+        self.size = self.weight*100
 
     def describe(self, silent = False):
         '''
@@ -183,10 +228,14 @@ class anchor(object):
         '''
         if silent == False:
             print("Anchor %(nr)s positioned in %(position)s, has friction: %(friction).2f, weight: %(weight).2f, size: %(size).2f" % vars(self))
-        return (self.position, self.friction, self.weight, self.size)
-    
-    
-class muscle(object):
+        return (self.initial_position, self.friction, self.weight, self.size) 
+
+    def display(self):
+        fill(255, 255, 255, 200)
+        size = self.size
+        ellipse(self.location.x, self.location.y, size, size)
+
+class Muscle(object):
     def __init__(self, nr, anchor_A = None, anchor_B = None, anchors_nr = 2):
         '''
         Initialize an muscle instance attached to two different anchors with random contraction time and speed, and relaxation time.
@@ -236,4 +285,9 @@ class muscle(object):
         if silent == False:
             print("Muscle %(nr)s attached to anchors %(connection)s, has contraction time: %(contraction_time).2f, contraction speed: %(contraction_speed).2f, relaxation time: %(relaxation_time).2f" % vars(self))
         return (self.connection, self.contraction_time, self.contraction_speed, self.relaxation_time)
-    
+
+    def display(self, anchors):
+        anchor_A = anchors[self.connection[0] - 1].location
+        anchor_B = anchors[self.connection[1] - 1].location
+        stroke(255)
+        line(anchor_A.x, anchor_A.y, anchor_B.x, anchor_B.y) 
